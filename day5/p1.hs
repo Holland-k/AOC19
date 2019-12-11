@@ -56,8 +56,8 @@ getSnd (_, x, _) = x
 runComp :: State (Addr, Input, Mem) [Input]
 runComp = fmap toList <$> untilJust $ do
   (ind, inp, m) <- get
-  let (o, p1, p2, p3) = parseOp $ S.index m ind
-  case o of
+  let (output, p1, p2, p3) = parseOp $ S.index m ind
+  case output of
     1 -> put (ind + 4, -- add
               inp,
               writeAddr
@@ -71,8 +71,8 @@ runComp = fmap toList <$> untilJust $ do
               writeAddr
                (S.index m $ ind+3)
                ((readAddr p1 (ind + 1) m) *
-                (readAddr p2 (ind + 2) m))
-               m)
+                 (readAddr p2 (ind + 2) m))
+               m)     
          >> pure Nothing
     3 -> put (ind+2, -- save
               inp,
@@ -85,7 +85,28 @@ runComp = fmap toList <$> untilJust $ do
               S.index m $ S.index m $ ind+1,
               m)
          >> pure Nothing
-    99 -> pure $ Just m -- terminate
+    5 -> if((readAddr p1 (ind + 1) m) /= 0)
+         then put (readAddr p2 (ind+2) m, inp, writeAddr ind inp m)
+              >> pure Nothing
+         else put (ind + 3, inp, writeAddr ind inp m) >> pure Nothing
+    6 -> if((readAddr p1 (ind + 1) m) == 0)
+         then put (readAddr p2 (ind + 2) m, inp, writeAddr ind inp m)
+              >> pure Nothing
+         else put (ind + 3, inp, writeAddr ind inp m) >> pure Nothing
+         >> pure Nothing
+    7 -> put (ind+4,
+              inp,
+              if ((readAddr p1 (ind + 1) m) < (readAddr p2 (ind + 2) m))
+               then writeAddr (readAddr 1 (ind + 3) m) 1 m
+              else writeAddr (readAddr 1 (ind + 3) m) 0 m)
+         >> pure Nothing
+    8 -> put (ind+4,
+              inp,
+              if ((readAddr p1 (ind + 1) m) == (readAddr p2 (ind +2) m))
+              then writeAddr (readAddr 1 (ind + 3) m) 1 m
+              else writeAddr (readAddr 1 (ind + 3) m) 0 m)
+         >> pure Nothing
+    99 -> pure $ Just m -- terminate1
     op -> put (0, inp, S.fromList [1,1,1,1]) >> pure Nothing
 
 fixInput :: Seq Int -> Seq Int
@@ -97,12 +118,12 @@ main = do
   content <- readFile (args !! 0)
   let lof = lines content
   print $
-    --Prelude.take 1 .
-    getSnd $ 
-    snd .
+    --Prelude.take 1 . -- Needed for Day 2
+    getSnd $  -- Needed for Day 5
+    snd .  -- Needed for Day 5; use fst for Day 2
     runState runComp $
     (0,(read (args !! 1)),) .
-    --fixInput $ 
+    --fixInput $ --Needed for Day 2
     fromList $
     parse $
     splitOn "," <$>
